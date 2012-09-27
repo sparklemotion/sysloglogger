@@ -1,3 +1,8 @@
+== 2.0 / Unreleased
+
+* SyslogLogger is now Syslog::Logger
+* Syslog::Logger has a formatter like Logger
+
 == 1.4.0 / 2007-05-08
 
 * Split from rails_analyzer_tools.
