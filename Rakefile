@@ -1,7 +1,6 @@
 # -*- ruby -*-
 
 require 'hoe'
-require './lib/syslog_logger.rb'
 
 Hoe.plugin :seattlerb
 

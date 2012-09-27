@@ -1,37 +1,52 @@
 require 'test/unit'
 require 'tempfile'
-require 'syslog_logger'
-
-module MockSyslog; end
-
-class << MockSyslog
-
-  @line = nil
-
-  SyslogLogger::LOGGER_MAP.values.uniq.each do |level|
-    eval <<-EOM
-      def #{level}(message)
-        @line = "#{level.to_s.upcase} - \#{message}"
-      end
-    EOM
-  end
-
-  attr_reader :line
-  attr_reader :program_name
-
-  def open(program_name)
-    @program_name = program_name
-  end
-
-  def reset
-    @line = ''
-  end
-
+begin
+  require 'syslog/logger'
+rescue LoadError
+  # skip.  see the bottom of this file.
 end
 
-SyslogLogger.const_set :SYSLOG, MockSyslog
+# These tests ensure Syslog::Logger works like Logger
 
-class TestLogger < Test::Unit::TestCase
+class TestSyslogRootLogger < Test::Unit::TestCase
+
+  module MockSyslog
+    LEVEL_LABEL_MAP = {}
+
+    class << self
+
+      @line = nil
+
+      %w[ALERT ERR WARNING NOTICE INFO DEBUG].each do |name|
+        level = Syslog.const_get("LOG_#{name}")
+        LEVEL_LABEL_MAP[level] = name
+
+        eval <<-EOM
+          def #{name.downcase}(format, *args)
+            log(#{level}, format, *args)
+          end
+        EOM
+      end
+
+      def log(level, format, *args)
+        @line = "#{LEVEL_LABEL_MAP[level]} - \#{format % args}"
+      end
+
+      attr_reader :line
+      attr_reader :program_name
+
+      def open(program_name)
+        @program_name = program_name
+      end
+
+      def reset
+        @line = ''
+      end
+
+    end
+  end
+
+  Syslog::Logger.syslog = MockSyslog
 
   LEVEL_LABEL_MAP = {
     Logger::DEBUG => 'DEBUG',
@@ -443,14 +458,22 @@ class TestLogger < Test::Unit::TestCase
     assert_equal false, @logger.debug?
   end
 
-end
+end if defined?(Syslog)
 
-class TestSyslogLogger < TestLogger
+class TestSyslogLogger < TestSyslogRootLogger
 
   def setup
     super
-    @logger = SyslogLogger.new
+    @logger = Syslog::Logger.new
   end
+
+  SEVERITY_MAP = {}.tap { |map|
+    level2severity = Syslog::Logger::LEVEL_MAP.invert
+
+    MockSyslog::LEVEL_LABEL_MAP.each { |level, name|
+      map[name] = TestSyslogRootLogger::LEVEL_LABEL_MAP[level2severity[level]]
+    }
+  }
 
   class Log
     attr_reader :line, :label, :datetime, :pid, :severity, :progname, :msg
@@ -458,9 +481,7 @@ class TestSyslogLogger < TestLogger
       @line = line
       return unless /\A(\w+) - (.*)\Z/ =~ @line
       severity, @msg = $1, $2
-      severity = SyslogLogger::LOGGER_MAP.invert[severity.downcase.intern]
-      @severity = severity.to_s.upcase
-      @severity = 'ANY' if @severity == 'UNKNOWN'
+      @severity = SEVERITY_MAP[severity]
     end
   end
 
@@ -487,5 +508,4 @@ class TestSyslogLogger < TestLogger
     assert_equal false, @logger.unknown?
   end
 
-end
-
+end if defined?(Syslog)
