@@ -65,12 +65,12 @@ class TestSyslogRootLogger < Test::Unit::TestCase
     attr_reader :line, :label, :datetime, :pid, :severity, :progname, :msg
     def initialize(line)
       @line = line
-      /\A(\w+), \[([^#]*)#(\d+)\]\s+(\w+) -- (\w*): ([\x0-\xff]*)/ =~ @line
+      /\A(\w+), \[([^#]*)#(\d+)\]\s+(\w+) -- (\w*): ([\x0-\xff]*)\n\z/ =~ @line
       @label, @datetime, @pid, @severity, @progname, @msg = $1, $2, $3, $4, $5, $6
     end
   end
 
-  def log_add(severity, msg, progname = nil, &block)
+  def log_add(severity, msg = nil, progname = nil, &block)
     log(:add, severity, msg, progname, &block)
   end
 
@@ -468,6 +468,18 @@ class TestSyslogRootLogger < Test::Unit::TestCase
     assert_equal false, @logger.debug?
   end
 
+  def test_blocks
+    message = 'A message logged from within a block'
+    msg = log(:debug) { message }
+    assert_equal LEVEL_LABEL_MAP[Logger::DEBUG], msg.severity
+    assert_equal message, msg.msg
+
+    # Test compatibility with logger.debug('progname') { 'a message' }
+    msg = log(:debug, 'progname') { message }
+    assert_equal LEVEL_LABEL_MAP[Logger::DEBUG], msg.severity
+    assert_equal message, msg.msg
+  end
+
 end if defined?(Syslog)
 
 class TestSyslogLogger < TestSyslogRootLogger
@@ -495,7 +507,7 @@ class TestSyslogLogger < TestSyslogRootLogger
     end
   end
 
-  def log_add(severity, msg, progname = nil, &block)
+  def log_add(severity, msg = nil, progname = nil, &block)
     log(:add, severity, msg, progname, &block)
   end
 
