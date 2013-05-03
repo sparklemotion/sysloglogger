@@ -186,8 +186,14 @@ class Syslog::Logger
 
   def add severity, message = nil, progname = nil, &block
     severity ||= ::Logger::UNKNOWN
+
+    if progname.nil? && block_given?
+      progname = message
+      message = block.call
+    end
+
     @level <= severity and
-      @@syslog.log LEVEL_MAP[severity], '%s', formatter.call(severity, Time.now, progname, (message || block.call))
+      @@syslog.log LEVEL_MAP[severity], '%s', formatter.call(severity, Time.now, progname, message)
     true
   end
 end
