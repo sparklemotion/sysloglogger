@@ -65,7 +65,7 @@ class TestSyslogRootLogger < Test::Unit::TestCase
     attr_reader :line, :label, :datetime, :pid, :severity, :progname, :msg
     def initialize(line)
       @line = line
-      /\A(\w+), \[([^#]*)#(\d+)\]\s+(\w+) -- (\w*): ([\x0-\xff]*)/ =~ @line
+      /\A(\w+), \[([^#]*)#(\d+)\]\s+(\w+) -- (\w*): ((?:.|\n)*)/ =~ @line
       @label, @datetime, @pid, @severity, @progname, @msg = $1, $2, $3, $4, $5, $6
     end
   end
